@@ -1,3 +1,9 @@
+# Frappe Session Gateway
+This Next.js app keeps Frappe authentication server-side. The browser calls `/api/auth/*`; `server.ts` proxies `/socket.io` and can add a Frappe token without exposing it to the client.
+
+Copy `.env.example` to `.env.local`, fill in the optional token pair if needed, then run `npm run dev`.
+
+For production, run `npm run build` and `npm start` on a Node host that supports WebSocket upgrades. Vercel serverless hosting cannot run this Socket.IO proxy.
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
