@@ -320,6 +320,28 @@ export default function Dashboard({ mode }: DashboardProps) {
     });
   }
 
+  function toggleItemChecked(orderId: string, itemId: string) {
+    const update = (order: Order) =>
+      order.id === orderId
+        ? {
+            ...order,
+            items: order.items.map((item) =>
+              item.id === itemId ? { ...item, checked: !item.checked } : item,
+            ),
+          }
+        : order;
+
+    setOrders((current) => current.map(update));
+    setSelected((current) => (current ? update(current) : current));
+  }
+
+  function canAdvance(order: Order) {
+    return (
+      order.status !== "cooking" ||
+      (order.items.length > 0 && order.items.every((item) => item.checked))
+    );
+  }
+
   function handleDateChange(date: string) {
     setSelectedDate(date);
     setOrders([]);
@@ -517,12 +539,15 @@ export default function Dashboard({ mode }: DashboardProps) {
               {nextStatus[order.status] && (
                 <Button
                   className="mt-5 w-full justify-center rounded-full py-2"
+                  disabled={!canAdvance(order)}
                   onClick={(event) => {
                     event.stopPropagation();
                     void updateStatus(order, nextStatus[order.status]!);
                   }}
                 >
-                  Move to {statusLabel(nextStatus[order.status]!)}
+                  {canAdvance(order)
+                    ? `Move to ${statusLabel(nextStatus[order.status]!)} `
+                    : "Check off all items first"}
                 </Button>
               )}
             </Card>
@@ -574,25 +599,43 @@ export default function Dashboard({ mode }: DashboardProps) {
                   {selected.items.map((item) => (
                     <li
                       key={item.id}
-                      className="flex items-center justify-between border-b border-slate-200 py-2"
+                      className="border-b border-slate-200 py-2"
                     >
-                      <span>
-                        {item.qty} × {item.name}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {item.prepTime}m
-                      </span>
+                      <label
+                        className={`flex w-full items-center justify-between gap-3 ${selected.status === "cooking" ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
+                      >
+                        <span className="flex min-w-0 flex-1 items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          disabled={selected.status !== "cooking"}
+                          onChange={() =>
+                            toggleItemChecked(selected.id, item.id)
+                          }
+                          className="h-4 w-4 accent-slate-950"
+                        />
+                        <span className={item.checked ? "line-through" : ""}>
+                          {item.qty} × {item.name}
+                        </span>
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {item.prepTime}m
+                        </span>
+                      </label>
                     </li>
                   ))}
                 </ul>
                 {nextStatus[selected.status] && (
                   <Button
                     className="mt-auto w-full justify-center rounded-full"
+                    disabled={!canAdvance(selected)}
                     onClick={() =>
                       void updateStatus(selected, nextStatus[selected.status]!)
                     }
                   >
-                    Move to {statusLabel(nextStatus[selected.status]!)}
+                    {canAdvance(selected)
+                      ? `Move to ${statusLabel(nextStatus[selected.status]!)} `
+                      : "Check off all items first"}
                   </Button>
                 )}
               </section>
