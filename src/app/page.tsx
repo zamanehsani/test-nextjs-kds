@@ -1,5 +1,7 @@
-import Dashboard from './dashboard'
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return <Dashboard />
+export default async function Home() {
+  const session = (await cookies()).get("sid");
+  redirect(session ? "/dashboard" : "/login");
 }

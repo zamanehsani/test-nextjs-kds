@@ -1,8 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
 
-:root { --ink: #17231f; --paper: #edf0e8; --acid: #d7f36b; --coral: #ff735c; }
-* { box-sizing: border-box; margin: 0; }
-html, body { min-height: 100%; }
-body { background: var(--paper); color: var(--ink); font-family: 'Space Grotesk', sans-serif; }
-button, input { font: inherit; }
-button { cursor: pointer; }
+:root {
+  --ink: #17231f;
+  --paper: #edf0e8;
+  --acid: #d7f36b;
+  --coral: #ff735c;
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+html,
+body {
+  min-height: 100%;
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Space Grotesk", sans-serif;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
