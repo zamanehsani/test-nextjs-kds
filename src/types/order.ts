@@ -16,6 +16,7 @@ export interface Order {
   id: string;
   orderNumber: string;
   customerName: string;
+  customerNote: string;
   phone: string;
   time: string;
   type: OrderType;

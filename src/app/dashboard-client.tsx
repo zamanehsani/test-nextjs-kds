@@ -44,6 +44,18 @@ const nextStatus: Partial<Record<OrderStatus, OrderStatus>> = {
 
 const statusLabel = (value: string) =>
   value.charAt(0).toUpperCase() + value.slice(1);
+const COOKING_STARTS_KEY = "kds-cooking-starts";
+
+function maxPrepMinutes(order: Order) {
+  return order.items.reduce((max, item) => Math.max(max, item.prepTime || 0), 0);
+}
+
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
 const siteNamespace = (
   process.env.NEXT_PUBLIC_SITE_NAMESPACE ||
   `/${process.env.NEXT_PUBLIC_SITE_NAME || "kababrayhan.com"}`
@@ -89,6 +101,83 @@ export default function Dashboard({ mode }: DashboardProps) {
     new Intl.DateTimeFormat("en-CA").format(new Date()),
   );
   const audio = useRef<HTMLAudioElement | null>(null);
+  const [cookingStarts, setCookingStarts] = useState<Record<string, number>>(
+    {},
+  );
+  const [now, setNow] = useState(() => Date.now());
+
+  // Countdown clock only runs on the dashboard, ticking once a second.
+  useEffect(() => {
+    if (mode !== "dashboard") return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [mode]);
+
+  // Persist cooking start times so a page refresh doesn't reset countdowns.
+  useEffect(() => {
+    if (mode !== "dashboard") return;
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem(COOKING_STARTS_KEY) || "{}",
+      ) as Record<string, number>;
+      setCookingStarts(stored);
+    } catch {
+      // ignore malformed storage
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "dashboard") return;
+    localStorage.setItem(COOKING_STARTS_KEY, JSON.stringify(cookingStarts));
+  }, [cookingStarts, mode]);
+
+  // Start a timer the moment an order enters cooking; clear it once it leaves.
+  useEffect(() => {
+    setCookingStarts((current) => {
+      const cookingIds = new Set(
+        orders.filter((order) => order.status === "cooking").map((o) => o.id),
+      );
+      let changed = false;
+      const next = { ...current };
+      orders.forEach((order) => {
+        if (order.status === "cooking" && next[order.id] === undefined) {
+          next[order.id] = Date.now();
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach((id) => {
+        if (!cookingIds.has(id)) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [orders]);
+
+  function cookingCountdown(order: Order) {
+    if (order.status !== "cooking") return null;
+    const start = cookingStarts[order.id];
+    const totalMs = maxPrepMinutes(order) * 60000;
+    if (!start || totalMs <= 0) return null;
+    const elapsedMs = now - start;
+    const isOverdue = elapsedMs >= totalMs;
+    return {
+      remainingMs: Math.max(0, totalMs - elapsedMs),
+      overdueMs: Math.max(0, elapsedMs - totalMs),
+      isOverdue,
+      ratio: Math.max(0, Math.min(1, (totalMs - elapsedMs) / totalMs)),
+    };
+  }
+
+  function cookingTone(order: Order) {
+    const countdown = cookingCountdown(order);
+    if (!countdown) return "";
+    if (countdown.isOverdue)
+      return "border-2 border-red-500 bg-red-50 animate-pulse";
+    if (countdown.ratio <= 0.2) return "border-2 border-amber-400 bg-amber-50";
+    return "border-2 border-emerald-400 bg-emerald-50";
+  }
 
   function mergeOrders(incoming: Order[]) {
     setOrders((current) => {
@@ -496,62 +585,74 @@ export default function Dashboard({ mode }: DashboardProps) {
         </div>
       ) : (
         <section className="mx-auto grid w-full max-w-6xl gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {visible.map((order) => (
-            <Card
-              key={order.id}
-              className="flex h-full min-h-[280px] cursor-pointer flex-col rounded-4xl border-0 p-3 shadow-none ring-0 transition hover:-translate-y-1 hover:shadow-lg"
-              onClick={() => setSelected(order)}
-            >
-              <div className="flex flex-1 flex-col">
-                <div className="flex justify-between gap-3">
-                  <div>
-                    <strong className="text-xl">{order.orderNumber}</strong>
-                    <p className="text-xs text-slate-500">
-                      {order.phone || order.customerName}
-                    </p>
+          {visible.map((order) => {
+            const countdown = cookingCountdown(order);
+            return (
+              <Card
+                key={order.id}
+                className={`flex h-full min-h-[280px] cursor-pointer flex-col rounded-4xl p-3 shadow-none ring-0 transition hover:-translate-y-1 hover:shadow-lg ${cookingTone(order) || "border-0"}`}
+                onClick={() => setSelected(order)}
+              >
+                <div className="flex flex-1 flex-col">
+                  <div className="flex justify-between gap-3">
+                    <div>
+                      <strong className="text-xl">{order.orderNumber}</strong>
+                      <p className="text-xs text-slate-500">
+                        {order.phone || order.customerName}
+                      </p>
+                    </div>
+                    <Badge className="bg-lime-200">
+                      {statusLabel(order.status)}
+                    </Badge>
                   </div>
-                  <Badge className="bg-lime-200">
-                    {statusLabel(order.status)}
-                  </Badge>
-                </div>
-                <p className="mt-4 border-b border-slate-200 pb-3 text-xs text-slate-500">
-                  {order.type} ·{" "}
-                  {new Date(order.time).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-                <ul className="mt-4 grid gap-2 py-3 text-sm text-slate-600">
-                  {order.items.slice(0, 3).map((item) => (
-                    <li key={item.id}>
-                      {item.qty} × {item.name}
-                    </li>
-                  ))}
-                </ul>
-                {order.items.length > 3 && (
-                  <p className="text-xs text-slate-400">
-                    +{order.items.length - 3} more item
-                    {order.items.length - 3 === 1 ? "" : "s"}
+                  <p className="mt-4 border-b border-slate-200 pb-3 text-xs text-slate-500">
+                    {order.type} ·{" "}
+                    {new Date(order.time).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </p>
-                )}
-              </div>
+                  {countdown && (
+                    <p
+                      className={`mt-3 text-sm font-semibold ${countdown.isOverdue ? "text-red-600" : countdown.ratio <= 0.2 ? "text-amber-600" : "text-emerald-600"}`}
+                    >
+                      {countdown.isOverdue
+                        ? `Overdue by ${formatCountdown(countdown.overdueMs)}`
+                        : `Ready in ${formatCountdown(countdown.remainingMs)}`}
+                    </p>
+                  )}
+                  <ul className="mt-4 grid gap-2 py-3 text-sm text-slate-600">
+                    {order.items.slice(0, 3).map((item) => (
+                      <li key={item.id}>
+                        {item.qty} × {item.name}
+                      </li>
+                    ))}
+                  </ul>
+                  {order.items.length > 3 && (
+                    <p className="text-xs text-slate-400">
+                      +{order.items.length - 3} more item
+                      {order.items.length - 3 === 1 ? "" : "s"}
+                    </p>
+                  )}
+                </div>
 
-              {nextStatus[order.status] && (
-                <Button
-                  className="mt-5 w-full justify-center rounded-full py-2"
-                  disabled={!canAdvance(order)}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void updateStatus(order, nextStatus[order.status]!);
-                  }}
-                >
-                  {canAdvance(order)
-                    ? `Move to ${statusLabel(nextStatus[order.status]!)} `
-                    : "Check off all items first"}
-                </Button>
-              )}
-            </Card>
-          ))}
+                {nextStatus[order.status] && (
+                  <Button
+                    className="mt-5 w-full justify-center rounded-full py-2"
+                    disabled={!canAdvance(order)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void updateStatus(order, nextStatus[order.status]!);
+                    }}
+                  >
+                    {canAdvance(order)
+                      ? `Move to ${statusLabel(nextStatus[order.status]!)} `
+                      : "Check off all items first"}
+                  </Button>
+                )}
+              </Card>
+            );
+          })}
         </section>
       )}
       {selected && (
@@ -566,6 +667,19 @@ export default function Dashboard({ mode }: DashboardProps) {
                 <p className="text-xs text-slate-500">{selected.id}</p>
               </div>
               <div className="flex items-center gap-2">
+                {(() => {
+                  const countdown = cookingCountdown(selected);
+                  if (!countdown) return null;
+                  return (
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${countdown.isOverdue ? "bg-red-100 text-red-600" : countdown.ratio <= 0.2 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}
+                    >
+                      {countdown.isOverdue
+                        ? `Overdue by ${formatCountdown(countdown.overdueMs)}`
+                        : `Ready in ${formatCountdown(countdown.remainingMs)}`}
+                    </span>
+                  );
+                })()}
                 <Badge className="bg-lime-200">
                   {statusLabel(selected.status)}
                 </Badge>
@@ -672,6 +786,12 @@ export default function Dashboard({ mode }: DashboardProps) {
                   <dd className="text-right">{selected.type}</dd>
                   <dt className="text-slate-500">Payment</dt>
                   <dd className="text-right">{selected.paymentStatus}</dd>
+                  {selected.customerNote && (
+                    <>
+                      <dt className="text-slate-500">Note</dt>
+                      <dd className="text-right">{selected.customerNote}</dd>
+                    </>
+                  )}
                 </dl>
               </section>
             </div>

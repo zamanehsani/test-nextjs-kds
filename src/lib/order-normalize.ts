@@ -33,23 +33,52 @@ function timestamp(value: unknown) {
     : parsed.toISOString();
 }
 
+// Frappe times can carry microseconds (HH:MM:SS.ffffff); Date only understands milliseconds.
+function transactionTimestamp(date: unknown, time: unknown) {
+  const rawDate = text(date);
+  if (!rawDate) return undefined;
+  const rawTime = text(time, "00:00:00");
+  const parsed = new Date(`${rawDate}T${rawTime.slice(0, 12)}`);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
 function itemsFrom(raw: Record<string, unknown>): OrderItem[] {
   const source = ["items", "order_items", "sales_order_items"]
     .map((key) => raw[key])
     .find(Array.isArray);
 
-  return (Array.isArray(source) ? source : [])
-    .filter(
-      (item): item is Record<string, unknown> =>
-        !!item && typeof item === "object",
-    )
-    .map((item, index) => ({
-      id: text(first(item, "name", "item_code"), `item-${index}`),
-      name: text(first(item, "item_name", "item_code"), "Item"),
-      qty: number(first(item, "qty"), 1),
-      prepTime: number(first(item, "prep_time", "custom_prep_time"), 5),
-      checked: false,
-    }));
+  const list = (Array.isArray(source) ? source : []).filter(
+    (item): item is Record<string, unknown> =>
+      !!item && typeof item === "object",
+  );
+
+  list.forEach((item) => {
+    const prepKeys = Object.keys(item).filter((key) => /prep.?time/i.test(key));
+    if (prepKeys.length) {
+      console.log(
+        "[order-normalize] prep time fields on item",
+        item.item_code || item.name,
+        Object.fromEntries(prepKeys.map((key) => [key, item[key]])),
+      );
+    }
+  });
+
+  return list.map((item, index) => ({
+    id: text(first(item, "name", "item_code"), `item-${index}`),
+    name: text(first(item, "item_name", "item_code"), "Item"),
+    qty: number(first(item, "qty"), 1),
+    prepTime: number(
+      first(
+        item,
+        "prep_time",
+        "custom_prep_time",
+        "preparation_time",
+        "custom_preparation_time",
+      ),
+      5,
+    ),
+    checked: false,
+  }));
 }
 
 export function normalizeOrder(value: unknown): Order {
@@ -66,6 +95,7 @@ export function normalizeOrder(value: unknown): Order {
   ) as Record<string, unknown>;
   const id = text(first(raw, "id", "name"));
   if (!id) throw new Error("Order payload is missing an id/name");
+  console.log("[order-normalize] raw order", id, raw);
   const status = text(
     first(raw, "status", "custom_cooking_status"),
     "New",
@@ -90,13 +120,15 @@ export function normalizeOrder(value: unknown): Order {
       first(raw, "customerName", "customer_name", "customer"),
       "Walk-in",
     ),
+    customerNote: text(first(raw, "customerNote", "custom_customer_note")),
     phone: text(
       first(raw, "phone", "contact_mobile", "contact_phone", "customer"),
     ),
     time:
       typeof raw.time === "string"
         ? raw.time
-        : timestamp(first(raw, "creation", "transaction_date")),
+        : (transactionTimestamp(raw.transaction_date, raw.transaction_time) ??
+          timestamp(first(raw, "creation", "modified"))),
     type: types.includes(type as OrderType) ? (type as OrderType) : "Takeaway",
     paymentStatus:
       text(raw.paymentStatus) === "Paid" || outstanding <= 0

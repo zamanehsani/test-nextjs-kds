@@ -36,6 +36,7 @@ export async function GET(request: Request) {
       { status: listResponse.status },
     );
   const list = (await listResponse.json()) as {
+    
     data?: Array<{ name: string }>;
   };
   const orders = await Promise.all(
