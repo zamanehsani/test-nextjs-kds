@@ -70,8 +70,8 @@ function itemsFrom(raw: Record<string, unknown>): OrderItem[] {
     prepTime: number(
       first(
         item,
-        "prep_time",
         "custom_prep_time",
+        "prep_time",
         "preparation_time",
         "custom_preparation_time",
       ),

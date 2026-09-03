@@ -102,7 +102,16 @@ export default function Dashboard({ mode }: DashboardProps) {
   );
   const audio = useRef<HTMLAudioElement | null>(null);
   const [cookingStarts, setCookingStarts] = useState<Record<string, number>>(
-    {},
+    () => {
+      if (typeof window === "undefined") return {};
+      try {
+        return JSON.parse(
+          localStorage.getItem(COOKING_STARTS_KEY) || "{}",
+        ) as Record<string, number>;
+      } catch {
+        return {};
+      }
+    },
   );
   const [now, setNow] = useState(() => Date.now());
 
@@ -116,44 +125,33 @@ export default function Dashboard({ mode }: DashboardProps) {
   // Persist cooking start times so a page refresh doesn't reset countdowns.
   useEffect(() => {
     if (mode !== "dashboard") return;
-    try {
-      const stored = JSON.parse(
-        localStorage.getItem(COOKING_STARTS_KEY) || "{}",
-      ) as Record<string, number>;
-      setCookingStarts(stored);
-    } catch {
-      // ignore malformed storage
-    }
-  }, [mode]);
-
-  useEffect(() => {
-    if (mode !== "dashboard") return;
     localStorage.setItem(COOKING_STARTS_KEY, JSON.stringify(cookingStarts));
   }, [cookingStarts, mode]);
 
   // Start a timer the moment an order enters cooking; clear it once it leaves.
-  useEffect(() => {
-    setCookingStarts((current) => {
-      const cookingIds = new Set(
-        orders.filter((order) => order.status === "cooking").map((o) => o.id),
-      );
-      let changed = false;
-      const next = { ...current };
-      orders.forEach((order) => {
-        if (order.status === "cooking" && next[order.id] === undefined) {
-          next[order.id] = Date.now();
-          changed = true;
-        }
-      });
-      Object.keys(next).forEach((id) => {
-        if (!cookingIds.has(id)) {
-          delete next[id];
-          changed = true;
-        }
-      });
-      return changed ? next : current;
+  // Adjusted directly during render (not in an effect) since it reacts to `orders` changing.
+  const [syncedOrders, setSyncedOrders] = useState(orders);
+  if (orders !== syncedOrders) {
+    setSyncedOrders(orders);
+    const cookingIds = new Set(
+      orders.filter((order) => order.status === "cooking").map((o) => o.id),
+    );
+    const next = { ...cookingStarts };
+    let changed = false;
+    orders.forEach((order) => {
+      if (order.status === "cooking" && next[order.id] === undefined) {
+        next[order.id] = Date.now();
+        changed = true;
+      }
     });
-  }, [orders]);
+    Object.keys(next).forEach((id) => {
+      if (!cookingIds.has(id)) {
+        delete next[id];
+        changed = true;
+      }
+    });
+    if (changed) setCookingStarts(next);
+  }
 
   function cookingCountdown(order: Order) {
     if (order.status !== "cooking") return null;
@@ -632,6 +630,11 @@ export default function Dashboard({ mode }: DashboardProps) {
                     <p className="text-xs text-slate-400">
                       +{order.items.length - 3} more item
                       {order.items.length - 3 === 1 ? "" : "s"}
+                    </p>
+                  )}
+                  {order.customerNote && (
+                    <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      Note: {order.customerNote}
                     </p>
                   )}
                 </div>
