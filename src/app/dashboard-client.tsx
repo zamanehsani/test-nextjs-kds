@@ -593,9 +593,11 @@ export default function Dashboard({ mode }: DashboardProps) {
               </div>
             </div>
             <div className="grid items-stretch gap-8 md:grid-cols-2">
-              <section className="order-2 flex min-h-[340px] flex-col md:order-1">
+              <section className="order-2 flex flex-col md:order-1">
                 <h2 className="text-xl font-bold">Items</h2>
-                <ul className="mt-4 min-h-[90px] flex-1 space-y-2 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <ul
+                  className={`mt-4 space-y-2 pr-1 ${selected.items.length > 3 ? "max-h-[160px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : ""}`}
+                >
                   {selected.items.map((item) => (
                     <li
                       key={item.id}
@@ -605,18 +607,18 @@ export default function Dashboard({ mode }: DashboardProps) {
                         className={`flex w-full items-center justify-between gap-3 ${selected.status === "cooking" ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
                       >
                         <span className="flex min-w-0 flex-1 items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          disabled={selected.status !== "cooking"}
-                          onChange={() =>
-                            toggleItemChecked(selected.id, item.id)
-                          }
-                          className="h-4 w-4 accent-slate-950"
-                        />
-                        <span className={item.checked ? "line-through" : ""}>
-                          {item.qty} × {item.name}
-                        </span>
+                          <input
+                            type="checkbox"
+                            checked={item.checked}
+                            disabled={selected.status !== "cooking"}
+                            onChange={() =>
+                              toggleItemChecked(selected.id, item.id)
+                            }
+                            className="h-4 w-4 accent-slate-950"
+                          />
+                          <span className={item.checked ? "line-through" : ""}>
+                            {item.qty} × {item.name}
+                          </span>
                         </span>
                         <span className="text-xs text-slate-500">
                           {item.prepTime}m
@@ -625,9 +627,15 @@ export default function Dashboard({ mode }: DashboardProps) {
                     </li>
                   ))}
                 </ul>
+                {selected.items.length > 3 && (
+                  <p className="mt-2 text-xs text-slate-400">
+                    +{selected.items.length - 3} more item
+                    {selected.items.length - 3 === 1 ? "" : "s"}
+                  </p>
+                )}
                 {nextStatus[selected.status] && (
                   <Button
-                    className="mt-auto w-full justify-center rounded-full"
+                    className="mt-5 w-full justify-center rounded-full"
                     disabled={!canAdvance(selected)}
                     onClick={() =>
                       void updateStatus(selected, nextStatus[selected.status]!)
