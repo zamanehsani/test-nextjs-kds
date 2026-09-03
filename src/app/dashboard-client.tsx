@@ -386,8 +386,8 @@ export default function Dashboard({ mode }: DashboardProps) {
 
   if (mode === "login") {
     return (
-      <main className="grid min-h-screen place-items-center  p-6">
-        <section className="w-full max-w-md rounded-2xl bg-white p-8 ">
+      <main className="grid min-h-screen place-items-center p-6">
+        <section className="w-full max-w-md rounded-2xl  bg-white p-8 ">
           <p className="font-mono text-center text-xs uppercase tracking-widest text-slate-500">
             Kabab Al Rayhan Restaurant
           </p>
@@ -439,8 +439,8 @@ export default function Dashboard({ mode }: DashboardProps) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-4 text-slate-950 sm:p-4">
-      <header className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-4 border-b border-slate-300 pb-2">
+    <main className="flex min-h-screen flex-col items-center justify-start bg-slate-100 p-4 text-slate-950 sm:p-4">
+      <header className="mx-auto flex w-full max-w-6xl flex-wrap items-end justify-between gap-4 border-b border-slate-300 pb-2">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-slate-500">
             Kitchen display / today
@@ -471,7 +471,7 @@ export default function Dashboard({ mode }: DashboardProps) {
           </Button>
         </div>
       </header>
-      <nav className="mx-auto flex justify-center max-w-7xl flex-wrap gap-2 py-2">
+      <nav className="mx-auto flex w-full max-w-6xl justify-center flex-wrap gap-2 py-2">
         {filters.map((item) => (
           <Button
             key={item}
@@ -495,7 +495,7 @@ export default function Dashboard({ mode }: DashboardProps) {
           KITCHEN CLEAR
         </div>
       ) : (
-        <section className="mx-auto pt-4 grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <section className="mx-auto grid w-full max-w-6xl gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {visible.map((order) => (
             <Card
               key={order.id}
@@ -596,7 +596,7 @@ export default function Dashboard({ mode }: DashboardProps) {
               <section className="order-2 flex flex-col md:order-1">
                 <h2 className="text-xl font-bold">Items</h2>
                 <ul
-                  className={`mt-4 space-y-2 pr-1 ${selected.items.length > 3 ? "max-h-[160px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : ""}`}
+                  className={`mt-4 min-h-36 space-y-2 pr-1 ${selected.items.length > 3 ? "max-h-40 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : ""}`}
                 >
                   {selected.items.map((item) => (
                     <li
@@ -635,7 +635,7 @@ export default function Dashboard({ mode }: DashboardProps) {
                 )}
                 {nextStatus[selected.status] && (
                   <Button
-                    className="mt-5 w-full justify-center rounded-full"
+                    className="mt-auto w-full justify-center rounded-full"
                     disabled={!canAdvance(selected)}
                     onClick={() =>
                       void updateStatus(selected, nextStatus[selected.status]!)
